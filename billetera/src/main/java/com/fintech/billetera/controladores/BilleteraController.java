@@ -46,15 +46,26 @@ public class BilleteraController {
         return "index";
     }
 
-    @PostMapping("/usuario/registrar")
-    public String registrarUsuario(@RequestParam String id,
-            @RequestParam String nombre,
-            @RequestParam String email,
-            @RequestParam String telefono) {
-        Usuario u = new Usuario(id, nombre, email, telefono);
-        gestor.registrarUsuario(u);
+   @PostMapping("/usuario/registrar")
+public String registrarUsuario(@RequestParam String id,
+        @RequestParam String nombre,
+        @RequestParam String email,
+        @RequestParam String telefono,
+        org.springframework.web.servlet.mvc.support.RedirectAttributes attrs) {
+
+    Usuario existente = gestor.getUsuario(id);
+
+    if (existente != null) {
+        attrs.addFlashAttribute("toastError", "Ya existe un usuario registrado con el ID: " + id);
         return "redirect:/";
     }
+
+    Usuario u = new Usuario(id, nombre, email, telefono);
+    gestor.registrarUsuario(u);
+
+    attrs.addFlashAttribute("toast", "Usuario registrado correctamente");
+    return "redirect:/";
+}
 
     @PostMapping("/usuario/eliminar")
     public String eliminarUsuario(@RequestParam String id) {
@@ -452,12 +463,12 @@ public class BilleteraController {
         if (auditorias.isEmpty()) {
             for (Transaccion txn : transaccionesRiesgo) {
                 auditorias.add(
-                        txn.getFecha() +
-                                " - IA detectó riesgo " + txn.getNivelRiesgo() +
-                                " en la transacción " + txn.getId() +
-                                " del usuario " + txn.getUsuarioId() +
-                                ". Tipo: " + txn.getTipo() +
-                                ". Monto: $" + txn.getValor());
+                        txn.getFecha()
+                                + " - IA detectó riesgo " + txn.getNivelRiesgo()
+                                + " en la transacción " + txn.getId()
+                                + " del usuario " + txn.getUsuarioId()
+                                + ". Tipo: " + txn.getTipo()
+                                + ". Monto: $" + txn.getValor());
             }
         }
 

@@ -452,6 +452,80 @@
             text-align: center;
             font-size: 14px;
         }
+        .toast-center {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    width: 260px;
+    min-height: 190px;
+    transform: translate(-50%, -50%);
+    z-index: 9999;
+    background: #ffffff;
+    border-radius: 22px;
+    padding: 26px 22px;
+    text-align: center;
+    box-shadow: 0 25px 60px rgba(15, 23, 42, 0.25);
+    border: 1px solid #e5e7eb;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    animation: showToastBox 0.25s ease;
+}
+
+.toast-icon {
+    width: 58px;
+    height: 58px;
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 30px;
+    font-weight: 900;
+    margin-bottom: 14px;
+}
+
+.toast-title {
+    font-size: 18px;
+    font-weight: 900;
+    color: #0f172a;
+    margin-bottom: 6px;
+}
+
+.toast-message {
+    font-size: 14px;
+    color: #64748b;
+    font-weight: 700;
+    line-height: 1.4;
+}
+
+.toast-success .toast-icon {
+    background: #dcfce7;
+    color: #16a34a;
+}
+
+.toast-error .toast-icon {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.toast-center.hide {
+    opacity: 0;
+    transform: translate(-50%, -55%) scale(0.96);
+    transition: all 0.25s ease;
+}
+
+@keyframes showToastBox {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -45%) scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
 
         @media (max-width: 1000px) {
             .dashboard-grid {
@@ -517,10 +591,26 @@
                 font-size: 23px;
             }
         }
+
     </style>
 </head>
 
 <body>
+    <div th:if="${toast}" class="toast-center toast-success">
+    <div class="toast-icon">✓</div>
+    <div class="toast-title">Operación exitosa</div>
+    <div class="toast-message" th:text="${toast}">
+        Operación realizada correctamente
+    </div>
+</div>
+
+<div th:if="${toastError}" class="toast-center toast-error">
+    <div class="toast-icon">!</div>
+    <div class="toast-title">Error</div>
+    <div class="toast-message" th:text="${toastError}">
+        Ocurrió un error
+    </div>
+</div>
 <nav class="navbar">
     <a href="/" class="brand">
         <span class="brand-icon">💳</span>
@@ -677,6 +767,19 @@
         if (menu && wrapper && !wrapper.contains(event.target)) {
             menu.classList.remove('show');
         }
+    });
+     document.addEventListener("DOMContentLoaded", function () {
+        const toasts = document.querySelectorAll(".toast-center");
+
+        toasts.forEach(function (toast) {
+            setTimeout(function () {
+                toast.classList.add("hide");
+
+                setTimeout(function () {
+                    toast.remove();
+                }, 300);
+            }, 1000);
+        });
     });
 </script>
 </body>
