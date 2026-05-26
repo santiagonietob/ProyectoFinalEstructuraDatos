@@ -708,7 +708,7 @@ if (origen.getEstado() != EstadoBilletera.ACTIVA) {
             boolean exito = gestor.getSistemaRecompensas().canjearBeneficio(u, beneficioId);
 
             if (exito) {
-                gestor.registrarUsuario(u);
+                gestor.actualizarUsuario(u);
                 gestor.generarAlerta(new Alerta(
                         "A" + System.currentTimeMillis(),
                         TipoAlerta.CANJE_BENEFICIO,
