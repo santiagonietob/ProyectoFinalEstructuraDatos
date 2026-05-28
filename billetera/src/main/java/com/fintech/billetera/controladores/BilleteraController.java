@@ -373,9 +373,13 @@ public class BilleteraController {
                 final java.util.Date inicioFinal = inicio;
                 final java.util.Date finFinal = fin;
 
-                txnFiltradas = todasTxn.stream()
-                        .filter(t -> !t.getFecha().before(inicioFinal) && !t.getFecha().after(finFinal))
-                        .collect(java.util.stream.Collectors.toList());
+                List<Transaccion> filtradas = new ArrayList<>();
+                for (Transaccion t : todasTxn) {
+                    if (!t.getFecha().before(inicioFinal) && !t.getFecha().after(finFinal)) {
+                        filtradas.add(t);
+                    }
+                }
+                txnFiltradas = filtradas;
             } catch (Exception e) {
                 System.out.println("Error parsing fechas: " + e.getMessage());
             }
@@ -396,42 +400,67 @@ public class BilleteraController {
         model.addAttribute("aristas", gestor.getGrafo().getTotalAristas());
 
         model.addAttribute("totalTransacciones", txnFiltradas.size());
-        double montoTotal = txnFiltradas.stream().mapToDouble(Transaccion::getValor).sum();
+        long recargas = 0, retiros = 0, transferencias = 0;
+        double montoTotal = 0;
+        for (Transaccion t : txnFiltradas) {
+            montoTotal += t.getValor();
+            if (t.getTipo() == TipoTransaccion.RECARGA)
+                recargas++;
+            else if (t.getTipo() == TipoTransaccion.RETIRO)
+                retiros++;
+            else if (t.getTipo() == TipoTransaccion.TRANSFERENCIA)
+                transferencias++;
+        }
         model.addAttribute("montoTotal", montoTotal);
-
-        long recargas = txnFiltradas.stream().filter(t -> t.getTipo() == TipoTransaccion.RECARGA).count();
-        long retiros = txnFiltradas.stream().filter(t -> t.getTipo() == TipoTransaccion.RETIRO).count();
-        long transferencias = txnFiltradas.stream().filter(t -> t.getTipo() == TipoTransaccion.TRANSFERENCIA).count();
 
         model.addAttribute("recargas", recargas);
         model.addAttribute("retiros", retiros);
         model.addAttribute("transferencias", transferencias);
 
-        List<Transaccion> topTransacciones = txnFiltradas.stream()
-                .sorted((t1, t2) -> Double.compare(t2.getValor(), t1.getValor()))
-                .limit(5)
-                .collect(java.util.stream.Collectors.toList());
+        // Top 5 por valor - ordenamiento burbuja descendente
+        List<Transaccion> topTransacciones = new ArrayList<>(txnFiltradas);
+        for (int i = 0; i < topTransacciones.size() - 1; i++) {
+            for (int j = 0; j < topTransacciones.size() - i - 1; j++) {
+                if (topTransacciones.get(j).getValor() < topTransacciones.get(j + 1).getValor()) {
+                    Transaccion temp = topTransacciones.get(j);
+                    topTransacciones.set(j, topTransacciones.get(j + 1));
+                    topTransacciones.set(j + 1, temp);
+                }
+            }
+        }
+        if (topTransacciones.size() > 5) {
+            topTransacciones = topTransacciones.subList(0, 5);
+        }
         model.addAttribute("topTransacciones", topTransacciones);
 
-        List<Transaccion> ultimasTransacciones = txnFiltradas.stream()
-                .sorted((t1, t2) -> t2.getFecha().compareTo(t1.getFecha()))
-                .limit(10)
-                .collect(java.util.stream.Collectors.toList());
+        // Últimas 10 por fecha - ordenamiento burbuja descendente
+        List<Transaccion> ultimasTransacciones = new ArrayList<>(txnFiltradas);
+        for (int i = 0; i < ultimasTransacciones.size() - 1; i++) {
+            for (int j = 0; j < ultimasTransacciones.size() - i - 1; j++) {
+                if (ultimasTransacciones.get(j).getFecha().before(ultimasTransacciones.get(j + 1).getFecha())) {
+                    Transaccion temp = ultimasTransacciones.get(j);
+                    ultimasTransacciones.set(j, ultimasTransacciones.get(j + 1));
+                    ultimasTransacciones.set(j + 1, temp);
+                }
+            }
+        }
+        if (ultimasTransacciones.size() > 10) {
+            ultimasTransacciones = ultimasTransacciones.subList(0, 10);
+        }
         model.addAttribute("ultimasTransacciones", ultimasTransacciones);
-
-        model.addAttribute("historial", new java.util.ArrayList<>());
 
         Usuario masActivo = null;
         int maxTxn = 0;
 
         for (Usuario u : todosUsuarios) {
-            final String uid = u.getId();
-            long cantidad = txnFiltradas.stream()
-                    .filter(t -> uid.equals(t.getUsuarioId()))
-                    .count();
-
+            int cantidad = 0;
+            for (Transaccion t : txnFiltradas) {
+                if (u.getId().equals(t.getUsuarioId())) {
+                    cantidad++;
+                }
+            }
             if (cantidad > maxTxn) {
-                maxTxn = (int) cantidad;
+                maxTxn = cantidad;
                 masActivo = u;
             }
         }
@@ -506,12 +535,23 @@ public class BilleteraController {
         model.addAttribute("tablaHashUsuarios", tablaHashUsuarios);
         model.addAttribute("tablaHashBilleteras", tablaHashBilleteras);
 
-        List<Transaccion> transaccionesRiesgo = txnFiltradas.stream()
-                .filter(t -> t.getEstado() == EstadoTransaccion.COMPLETADA)
-                .filter(t -> t.getNivelRiesgo() != null)
-                .filter(t -> t.getNivelRiesgo() != com.fintech.billetera.modelos.NivelRiesgo.BAJO)
-                .sorted((t1, t2) -> t2.getFecha().compareTo(t1.getFecha()))
-                .collect(java.util.stream.Collectors.toList());
+        List<Transaccion> transaccionesRiesgo = new ArrayList<>();
+        for (Transaccion t : txnFiltradas) {
+            if (t.getEstado() == EstadoTransaccion.COMPLETADA
+                    && t.getNivelRiesgo() != null
+                    && t.getNivelRiesgo() != com.fintech.billetera.modelos.NivelRiesgo.BAJO) {
+                transaccionesRiesgo.add(t);
+            }
+        }
+        for (int i = 0; i < transaccionesRiesgo.size() - 1; i++) {
+            for (int j = 0; j < transaccionesRiesgo.size() - i - 1; j++) {
+                if (transaccionesRiesgo.get(j).getFecha().before(transaccionesRiesgo.get(j + 1).getFecha())) {
+                    Transaccion temp = transaccionesRiesgo.get(j);
+                    transaccionesRiesgo.set(j, transaccionesRiesgo.get(j + 1));
+                    transaccionesRiesgo.set(j + 1, temp);
+                }
+            }
+        }
 
         model.addAttribute("transaccionesRiesgo", transaccionesRiesgo);
 
