@@ -4,6 +4,7 @@ import java.util.Comparator;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.scheduling.annotation.Scheduled;
 
@@ -61,7 +62,7 @@ public class GestorOperaciones {
     private DetectorComportamiento detector;
     private MotorAnalitica analitica = new MotorAnalitica();
 
-    public void registrarUsuario(Usuario usuario) {
+    public void registrarUsuario(@NonNull Usuario usuario) {
         List<Usuario> usuarios = usuarioRepo.findAll();
 
         for (Usuario u : usuarios) {
@@ -79,7 +80,7 @@ public class GestorOperaciones {
         System.out.println("Usuario registrado: " + usuario.getNombre());
     }
 
-    public void registrarBilletera(Billetera billetera) {
+    public void registrarBilletera(@NonNull Billetera billetera) {
         billeteraRepo.save(billetera);
         System.out.println("Billetera registrada: " + billetera.getNombre());
     }
@@ -381,57 +382,75 @@ public class GestorOperaciones {
 
     public void programarTransaccion(TxnProgramada txn) {
         if (txn.getFechaEjecucion().before(new java.util.Date())) {
-
             System.out.println("Fecha inválida.");
-
             return;
         }
+
+        if (txn.getBilleteraOrigenId() != null) {
+            Billetera origen = billeteraRepo.findById(txn.getBilleteraOrigenId()).orElse(null);
+            if (origen == null) {
+                System.out.println("Billetera origen no existe.");
+                return;
+            }
+            if (origen.getEstado() == com.fintech.billetera.modelos.EstadoBilletera.BLOQUEADA) {
+                System.out.println("Billetera origen bloqueada.");
+                return;
+            }
+            if (!origen.validarSaldo(txn.getValor())) {
+                System.out.println("Saldo insuficiente para programar la transacción.");
+                return;
+            }
+        }
+
         colaProgramadas.agregar(txn);
+        System.out.println("Transacción programada correctamente: " + txn.getId());
     }
 
     public void ejecutarProgramadas() {
 
-    while (!colaProgramadas.estaVacia() &&
-            colaProgramadas.peek().estaListaParaEjecutar()) {
+        while (!colaProgramadas.estaVacia() &&
+                colaProgramadas.peek().estaListaParaEjecutar()) {
 
-        TxnProgramada txn = colaProgramadas.poll();
+            TxnProgramada txn = colaProgramadas.poll();
 
-        Transaccion transaccion = new Transaccion(
-                txn.getId(),
-                txn.getTipo(),
-                txn.getValor(),
-                txn.getBilleteraOrigenId(),
-                txn.getBilleteraDestinoId()
-        );
+            Transaccion transaccion = new Transaccion(
+                    txn.getId(),
+                    txn.getTipo(),
+                    txn.getValor(),
+                    txn.getBilleteraOrigenId(),
+                    txn.getBilleteraDestinoId());
 
-        transaccion.setUsuarioId(txn.getUsuarioId());
+            transaccion.setUsuarioId(txn.getUsuarioId());
 
-        procesarTransaccion(transaccion);
+            procesarTransaccion(transaccion);
 
-        if (txn.getFrecuencia() == Frecuencia.SEMANAL) {
+            if (txn.getFrecuencia() == Frecuencia.SEMANAL) {
 
-            txn.setFechaEjecucion(
-                    new java.util.Date(
-                            txn.getFechaEjecucion().getTime()
-                                    + (7L * 24 * 60 * 60 * 1000)));
+                txn.setFechaEjecucion(
+                        new java.util.Date(
+                                txn.getFechaEjecucion().getTime()
+                                        + (7L * 24 * 60 * 60 * 1000)));
 
-            colaProgramadas.agregar(txn);
-        }
+                colaProgramadas.agregar(txn);
+            }
 
-        if (txn.getFrecuencia() == Frecuencia.MENSUAL) {
+            if (txn.getFrecuencia() == Frecuencia.MENSUAL) {
 
-            txn.setFechaEjecucion(
-                    new java.util.Date(
-                            txn.getFechaEjecucion().getTime()
-                                    + (30L * 24 * 60 * 60 * 1000)));
+                txn.setFechaEjecucion(
+                        new java.util.Date(
+                                txn.getFechaEjecucion().getTime()
+                                        + (30L * 24 * 60 * 60 * 1000)));
 
-            colaProgramadas.agregar(txn);
+                colaProgramadas.agregar(txn);
+            }
         }
     }
-}
 
     @Scheduled(fixedDelay = 60000)
     public void ejecutarProgramadasAutomaticamente() {
+
+        System.out.println(">>> Ejecutando programadas...");
+
         ejecutarProgramadas();
     }
 

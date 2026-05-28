@@ -46,27 +46,26 @@ public class BilleteraController {
         return "index";
     }
 
- @PostMapping("/usuario/registrar")
-public String registrarUsuario(@RequestParam String id,
-        @RequestParam String nombre,
-        @RequestParam String email,
-        @RequestParam String telefono,
-        org.springframework.web.servlet.mvc.support.RedirectAttributes attrs) {
+    @PostMapping("/usuario/registrar")
+    public String registrarUsuario(@RequestParam String id,
+            @RequestParam String nombre,
+            @RequestParam String email,
+            @RequestParam String telefono,
+            org.springframework.web.servlet.mvc.support.RedirectAttributes attrs) {
 
-    Usuario existente = gestor.getUsuario(id);
+        Usuario existente = gestor.getUsuario(id);
 
-    if (existente != null) {
-        attrs.addFlashAttribute("toastError", "Ya existe un usuario registrado con el ID: " + id);
+        if (existente != null) {
+            attrs.addFlashAttribute("toastError", "Ya existe un usuario registrado con el ID: " + id);
+            return "redirect:/";
+        }
+
+        Usuario u = new Usuario(id, nombre, email, telefono);
+        gestor.registrarUsuario(u);
+
+        attrs.addFlashAttribute("toast", "Usuario registrado correctamente");
         return "redirect:/";
     }
-
-    Usuario u = new Usuario(id, nombre, email, telefono);
-    gestor.registrarUsuario(u);
-
-    attrs.addFlashAttribute("toast", "Usuario registrado correctamente");
-    return "redirect:/";
-}
-
 
     @PostMapping("/usuario/eliminar")
     public String eliminarUsuario(@RequestParam String id) {
@@ -139,97 +138,97 @@ public String registrarUsuario(@RequestParam String id,
         return "usuario";
     }
 
-   @PostMapping("/transaccion/recarga")
-public String recargar(@RequestParam String billeteraId,
-        @RequestParam double monto,
-        @RequestParam String usuarioId,
-        org.springframework.web.servlet.mvc.support.RedirectAttributes attrs) {
+    @PostMapping("/transaccion/recarga")
+    public String recargar(@RequestParam String billeteraId,
+            @RequestParam double monto,
+            @RequestParam String usuarioId,
+            org.springframework.web.servlet.mvc.support.RedirectAttributes attrs) {
 
-    Billetera billetera = gestor.getBilletera(billeteraId);
+        Billetera billetera = gestor.getBilletera(billeteraId);
 
-    if (billetera == null) {
-        attrs.addFlashAttribute("toastError", "No existe la billetera con ID: " + billeteraId);
-        return "redirect:/usuarios/" + usuarioId;
-    }
-
-    if (!billeteraPerteneceAUsuario(billetera, usuarioId)) {
-        attrs.addFlashAttribute("toastError", "Esa billetera no pertenece a este usuario");
-        return "redirect:/usuarios/" + usuarioId;
-    }
-
-    if (monto <= 0) {
-        attrs.addFlashAttribute("toastError", "El monto de recarga debe ser mayor a cero");
-        return "redirect:/usuarios/" + usuarioId;
-    }
-
-    EstadoBilletera estadoAnterior = billetera.getEstado();
-    boolean estabaInactiva = estadoAnterior != EstadoBilletera.ACTIVA;
-
-    if (estabaInactiva) {
-        billetera.setEstado(EstadoBilletera.ACTIVA);
-        gestor.registrarBilletera(billetera);
-    }
-
-    Transaccion t = new Transaccion("T" + System.currentTimeMillis(),
-            TipoTransaccion.RECARGA, monto, null, billeteraId);
-
-    boolean exito = gestor.procesarTransaccion(t);
-
-    if (exito && t.getEstado() != EstadoTransaccion.RECHAZADA) {
-        if (estabaInactiva) {
-            attrs.addFlashAttribute("toast",
-                    "Recarga realizada correctamente. La billetera fue activada nuevamente");
-        } else {
-            attrs.addFlashAttribute("toast", "Recarga realizada correctamente");
+        if (billetera == null) {
+            attrs.addFlashAttribute("toastError", "No existe la billetera con ID: " + billeteraId);
+            return "redirect:/usuarios/" + usuarioId;
         }
-    } else {
+
+        if (!billeteraPerteneceAUsuario(billetera, usuarioId)) {
+            attrs.addFlashAttribute("toastError", "Esa billetera no pertenece a este usuario");
+            return "redirect:/usuarios/" + usuarioId;
+        }
+
+        if (monto <= 0) {
+            attrs.addFlashAttribute("toastError", "El monto de recarga debe ser mayor a cero");
+            return "redirect:/usuarios/" + usuarioId;
+        }
+
+        EstadoBilletera estadoAnterior = billetera.getEstado();
+        boolean estabaInactiva = estadoAnterior != EstadoBilletera.ACTIVA;
+
         if (estabaInactiva) {
-            billetera.setEstado(estadoAnterior);
+            billetera.setEstado(EstadoBilletera.ACTIVA);
             gestor.registrarBilletera(billetera);
         }
 
-        attrs.addFlashAttribute("toastError", "La recarga fue rechazada");
-    }
+        Transaccion t = new Transaccion("T" + System.currentTimeMillis(),
+                TipoTransaccion.RECARGA, monto, null, billeteraId);
 
-    return "redirect:/usuarios/" + usuarioId;
-}
+        boolean exito = gestor.procesarTransaccion(t);
 
-  @PostMapping("/transaccion/retiro")
-public String retirar(@RequestParam String billeteraId,
-        @RequestParam double monto,
-        @RequestParam String usuarioId,
-        org.springframework.web.servlet.mvc.support.RedirectAttributes attrs) {
+        if (exito && t.getEstado() != EstadoTransaccion.RECHAZADA) {
+            if (estabaInactiva) {
+                attrs.addFlashAttribute("toast",
+                        "Recarga realizada correctamente. La billetera fue activada nuevamente");
+            } else {
+                attrs.addFlashAttribute("toast", "Recarga realizada correctamente");
+            }
+        } else {
+            if (estabaInactiva) {
+                billetera.setEstado(estadoAnterior);
+                gestor.registrarBilletera(billetera);
+            }
 
-    Billetera billetera = gestor.getBilletera(billeteraId);
+            attrs.addFlashAttribute("toastError", "La recarga fue rechazada");
+        }
 
-    if (billetera == null) {
-        attrs.addFlashAttribute("toastError", "No existe la billetera con ID: " + billeteraId);
         return "redirect:/usuarios/" + usuarioId;
     }
 
-    if (!billeteraPerteneceAUsuario(billetera, usuarioId)) {
-        attrs.addFlashAttribute("toastError", "No puedes retirar de una billetera que no pertenece a este usuario");
+    @PostMapping("/transaccion/retiro")
+    public String retirar(@RequestParam String billeteraId,
+            @RequestParam double monto,
+            @RequestParam String usuarioId,
+            org.springframework.web.servlet.mvc.support.RedirectAttributes attrs) {
+
+        Billetera billetera = gestor.getBilletera(billeteraId);
+
+        if (billetera == null) {
+            attrs.addFlashAttribute("toastError", "No existe la billetera con ID: " + billeteraId);
+            return "redirect:/usuarios/" + usuarioId;
+        }
+
+        if (!billeteraPerteneceAUsuario(billetera, usuarioId)) {
+            attrs.addFlashAttribute("toastError", "No puedes retirar de una billetera que no pertenece a este usuario");
+            return "redirect:/usuarios/" + usuarioId;
+        }
+
+        if (billetera.getEstado() != EstadoBilletera.ACTIVA) {
+            attrs.addFlashAttribute("toastError", "No se puede retirar: la billetera está bloqueada o inactiva");
+            return "redirect:/usuarios/" + usuarioId;
+        }
+
+        Transaccion t = new Transaccion("T" + System.currentTimeMillis(),
+                TipoTransaccion.RETIRO, monto, billeteraId, null);
+
+        boolean exito = gestor.procesarTransaccion(t);
+
+        if (exito && t.getEstado() != EstadoTransaccion.RECHAZADA) {
+            attrs.addFlashAttribute("toast", "Retiro realizado correctamente");
+        } else {
+            attrs.addFlashAttribute("toastError", "Retiro rechazado: saldo insuficiente");
+        }
+
         return "redirect:/usuarios/" + usuarioId;
     }
-
-    if (billetera.getEstado() != EstadoBilletera.ACTIVA) {
-        attrs.addFlashAttribute("toastError", "No se puede retirar: la billetera está bloqueada o inactiva");
-        return "redirect:/usuarios/" + usuarioId;
-    }
-
-    Transaccion t = new Transaccion("T" + System.currentTimeMillis(),
-            TipoTransaccion.RETIRO, monto, billeteraId, null);
-
-    boolean exito = gestor.procesarTransaccion(t);
-
-    if (exito && t.getEstado() != EstadoTransaccion.RECHAZADA) {
-        attrs.addFlashAttribute("toast", "Retiro realizado correctamente");
-    } else {
-        attrs.addFlashAttribute("toastError", "Retiro rechazado: saldo insuficiente");
-    }
-
-    return "redirect:/usuarios/" + usuarioId;
-}
 
     @PostMapping("/transaccion/transferencia")
     public String transferir(@RequestParam String origenId,
@@ -262,9 +261,10 @@ public String retirar(@RequestParam String billeteraId,
             return "redirect:/usuarios/" + usuarioId;
         }
         if (origen.getEstado() != EstadoBilletera.ACTIVA) {
-    attrs.addFlashAttribute("toastError", "No se puede transferir: la billetera origen está bloqueada o inactiva");
-    return "redirect:/usuarios/" + usuarioId;
-}
+            attrs.addFlashAttribute("toastError",
+                    "No se puede transferir: la billetera origen está bloqueada o inactiva");
+            return "redirect:/usuarios/" + usuarioId;
+        }
 
         Transaccion t = new Transaccion("T" + System.currentTimeMillis(),
                 TipoTransaccion.TRANSFERENCIA, monto, origenId, destinoId);
@@ -313,10 +313,11 @@ public String retirar(@RequestParam String billeteraId,
             attrs.addFlashAttribute("toastError", "La billetera destino no pertenece al usuario indicado");
             return "redirect:/usuarios/" + usuarioId;
         }
-if (origen.getEstado() != EstadoBilletera.ACTIVA) {
-    attrs.addFlashAttribute("toastError", "No se puede transferir: la billetera origen está bloqueada o inactiva");
-    return "redirect:/usuarios/" + usuarioId;
-}
+        if (origen.getEstado() != EstadoBilletera.ACTIVA) {
+            attrs.addFlashAttribute("toastError",
+                    "No se puede transferir: la billetera origen está bloqueada o inactiva");
+            return "redirect:/usuarios/" + usuarioId;
+        }
         Transaccion t = new Transaccion("T" + System.currentTimeMillis(),
                 TipoTransaccion.TRANSFERENCIA, monto, origenId, destinoBilleteraId);
 
@@ -438,43 +439,68 @@ if (origen.getEstado() != EstadoBilletera.ACTIVA) {
         model.addAttribute("usuarioMasActivo", masActivo);
         model.addAttribute("txnUsuarioActivo", maxTxn);
 
-        Map<String, Long> conteoActividad = txnFiltradas.stream()
-                .flatMap(t -> java.util.stream.Stream.of(t.getBilleteraOrigenId(), t.getBilleteraDestinoId()))
-                .filter(id -> id != null)
-                .collect(java.util.stream.Collectors.groupingBy(id -> id, java.util.stream.Collectors.counting()));
+        com.fintech.billetera.estructuras.MapaHash<String, Long> conteoActividad = new com.fintech.billetera.estructuras.MapaHash<>();
 
-        List<Map.Entry<String, Long>> billeterasActivas = new ArrayList<>(conteoActividad.entrySet());
-        billeterasActivas.sort((a, b) -> Long.compare(b.getValue(), a.getValue()));
+        for (Transaccion t : txnFiltradas) {
+            if (t.getBilleteraOrigenId() != null) {
+                Long c = conteoActividad.obtener(t.getBilleteraOrigenId());
+                conteoActividad.poner(t.getBilleteraOrigenId(), c == null ? 1L : c + 1L);
+            }
+            if (t.getBilleteraDestinoId() != null) {
+                Long c = conteoActividad.obtener(t.getBilleteraDestinoId());
+                conteoActividad.poner(t.getBilleteraDestinoId(), c == null ? 1L : c + 1L);
+            }
+        }
 
+        com.fintech.billetera.estructuras.ListaSimple<String> clavesBilleteras = conteoActividad.claves();
         List<Map<String, Object>> billeterasConInfo = new ArrayList<>();
 
-        for (Map.Entry<String, Long> entry : billeterasActivas) {
-            Billetera bil = gestor.getBilletera(entry.getKey());
-
+        java.util.Iterator<String> itBill = clavesBilleteras.iterator();
+        while (itBill.hasNext()) {
+            String billId = itBill.next();
+            Billetera bil = gestor.getBilletera(billId);
             if (bil != null) {
                 Map<String, Object> info = new java.util.HashMap<>();
                 info.put("id", bil.getId());
                 info.put("nombre", bil.getNombre());
                 info.put("tipo", bil.getTipo());
                 info.put("saldo", bil.getSaldo());
-                info.put("movimientos", entry.getValue());
+                info.put("movimientos", conteoActividad.obtener(billId));
                 billeterasConInfo.add(info);
             }
         }
 
+        billeterasConInfo.sort((a, b) -> Long.compare((Long) b.get("movimientos"), (Long) a.get("movimientos")));
+
         model.addAttribute("billeterasActivas", billeterasConInfo);
 
-        Map<String, String> tablaHashUsuarios = new java.util.LinkedHashMap<>();
-
+        com.fintech.billetera.estructuras.MapaHash<String, String> mapaUsuarios = new com.fintech.billetera.estructuras.MapaHash<>();
         for (Usuario u : todosUsuarios) {
-            tablaHashUsuarios.put(u.getId(),
+            mapaUsuarios.poner(u.getId(),
                     u.getNombre() + " | " + u.getNivel() + " | " + u.getPuntosTotales() + " pts");
         }
 
-        Map<String, String> tablaHashBilleteras = new java.util.LinkedHashMap<>();
-
+        com.fintech.billetera.estructuras.MapaHash<String, String> mapaBilleteras = new com.fintech.billetera.estructuras.MapaHash<>();
         for (Billetera b : gestor.getTodasBilleteras()) {
-            tablaHashBilleteras.put(b.getId(), b.getNombre() + " | " + b.getTipo() + " | $" + b.getSaldo());
+            mapaBilleteras.poner(b.getId(),
+                    b.getNombre() + " | " + b.getTipo() + " | $" + b.getSaldo());
+        }
+
+        // convierte a LinkedHashMap solo para Thymeleaf
+        Map<String, String> tablaHashUsuarios = new java.util.LinkedHashMap<>();
+        com.fintech.billetera.estructuras.ListaSimple<String> clavesU = mapaUsuarios.claves();
+        java.util.Iterator<String> itU = clavesU.iterator();
+        while (itU.hasNext()) {
+            String clave = itU.next();
+            tablaHashUsuarios.put(clave, mapaUsuarios.obtener(clave));
+        }
+
+        Map<String, String> tablaHashBilleteras = new java.util.LinkedHashMap<>();
+        com.fintech.billetera.estructuras.ListaSimple<String> clavesB = mapaBilleteras.claves();
+        java.util.Iterator<String> itB = clavesB.iterator();
+        while (itB.hasNext()) {
+            String clave = itB.next();
+            tablaHashBilleteras.put(clave, mapaBilleteras.obtener(clave));
         }
 
         model.addAttribute("tablaHashUsuarios", tablaHashUsuarios);
@@ -635,6 +661,25 @@ if (origen.getEstado() != EstadoBilletera.ACTIVA) {
             java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm");
             java.util.Date fecha = sdf.parse(fechaEjecucion);
 
+            Billetera origen = gestor.getBilletera(origenId);
+
+            if (origen == null) {
+                attrs.addFlashAttribute("toastError", "No existe la billetera origen");
+                return "redirect:/usuarios/" + usuarioId;
+            }
+
+            if (!origen.validarSaldo(monto)) {
+                attrs.addFlashAttribute("toastError",
+                        "Saldo insuficiente para programar. Saldo actual: $"
+                                + String.format("%,.0f", origen.getSaldo()));
+                return "redirect:/usuarios/" + usuarioId;
+            }
+
+            if (origen.getEstado() == com.fintech.billetera.modelos.EstadoBilletera.BLOQUEADA) {
+                attrs.addFlashAttribute("toastError", "La billetera origen está bloqueada");
+                return "redirect:/usuarios/" + usuarioId;
+            }
+
             TxnProgramada txn = new TxnProgramada(
                     "TP" + System.currentTimeMillis(),
                     TipoTransaccion.PAGO_PROGRAMADO,
@@ -643,6 +688,7 @@ if (origen.getEstado() != EstadoBilletera.ACTIVA) {
             txn.setUsuarioId(usuarioId);
             gestor.programarTransaccion(txn);
             attrs.addFlashAttribute("toast", "Transacción programada correctamente");
+
         } catch (Exception e) {
             attrs.addFlashAttribute("toastError", "Error al programar la transacción");
             System.out.println("Error al programar: " + e.getMessage());
