@@ -860,4 +860,57 @@ public class BilleteraController {
         }
         return "redirect:/usuarios/" + usuarioId;
     }
+
+    @GetMapping("/api/usuarios/{usuarioId}/reversiones")
+    @ResponseBody
+    public List<Map<String, Object>> obtenerReversiones(@PathVariable String usuarioId) {
+        List<Map<String, Object>> resultado = new ArrayList<>();
+        List<com.fintech.billetera.modelos.Transaccion> todas = gestor.getHistorial(usuarioId);
+        java.util.Iterator<com.fintech.billetera.modelos.Transaccion> it = todas.iterator();
+        while (it.hasNext()) {
+            com.fintech.billetera.modelos.Transaccion t = it.next();
+            if (t.getEstado() == com.fintech.billetera.modelos.EstadoTransaccion.REVERTIDA) {
+                Map<String, Object> item = new java.util.HashMap<>();
+                item.put("id", t.getId());
+                item.put("tipo", t.getTipo().name());
+                item.put("valor", t.getValor());
+                item.put("fecha", t.getFecha());
+                item.put("origenId", t.getBilleteraOrigenId());
+                item.put("destinoId", t.getBilleteraDestinoId());
+                resultado.add(item);
+            }
+        }
+        return resultado;
+    }
+
+    @GetMapping("/api/notificaciones")
+    @ResponseBody
+    public List<Map<String, Object>> obtenerNotificaciones() {
+        List<Map<String, Object>> resultado = new ArrayList<>();
+        com.fintech.billetera.estructuras.ListaSimple<com.fintech.billetera.modelos.Alerta> noLeidas = gestor
+                .getColaNotificaciones().getNoLeidas();
+        java.util.Iterator<com.fintech.billetera.modelos.Alerta> it = noLeidas.iterator();
+        while (it.hasNext()) {
+            com.fintech.billetera.modelos.Alerta a = it.next();
+            Map<String, Object> item = new java.util.HashMap<>();
+            item.put("id", a.getId());
+            item.put("tipo", a.getTipo().name());
+            item.put("mensaje", a.getMensaje());
+            item.put("fecha", a.getFecha());
+            item.put("nivelRiesgo", a.getNivelRiesgo() != null ? a.getNivelRiesgo().name() : "BAJO");
+            item.put("urgente", a.esUrgente());
+            item.put("usuarioId", a.getUsuarioId());
+            resultado.add(item);
+        }
+        return resultado;
+    }
+
+    @PostMapping("/api/notificaciones/leer")
+    @ResponseBody
+    public Map<String, String> marcarNotificacionesLeidas() {
+        gestor.getColaNotificaciones().marcarTodasLeidas();
+        Map<String, String> resp = new java.util.HashMap<>();
+        resp.put("status", "ok");
+        return resp;
+    }
 }
